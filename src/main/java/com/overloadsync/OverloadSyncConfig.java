@@ -39,8 +39,8 @@ public interface OverloadSyncConfig extends Config
 	@ConfigItem(
 		keyName = "showSipCountdown",
 		name = "Countdown to lined-up sip",
-		description = "With no overload running, count down to the tick to click an overload so it is drunk<br>"
-			+ "1 tick after your stats decay. Comes round every 25 ticks.<br>"
+		description = "With no overload running, count down to the tick to click an overload so it re-boosts<br>"
+			+ "on the same tick your stats decay, so they never dip. Comes round every 25 ticks.<br>"
 			+ "Needs a boosted combat stat to have dropped by 1 since you logged in (shows ? until then).",
 		section = overloadSection,
 		position = 0
@@ -130,6 +130,78 @@ public interface OverloadSyncConfig extends Config
 	default int brewWindow()
 	{
 		return 24;
+	}
+
+	@ConfigItem(
+		keyName = "brewOnlyBelowHp",
+		name = "Only when HP is low",
+		description = "Only show the brew countdown while your hitpoints are at or below the level set below.<br>"
+			+ "An overload heals 50 when it wears off, so brewing while high just wastes the heal.",
+		section = brewSection,
+		position = 2
+	)
+	default boolean brewOnlyBelowHp()
+	{
+		return false;
+	}
+
+	@Range(min = 1, max = 99)
+	@ConfigItem(
+		keyName = "brewHpThreshold",
+		name = "At or below HP",
+		description = "Show the brew countdown while your hitpoints are at or below this",
+		section = brewSection,
+		position = 3
+	)
+	default int brewHpThreshold()
+	{
+		return 49;
+	}
+
+	@ConfigSection(
+		name = "Perfect timing",
+		description = "Chat message and a subtle ding when you land a perfectly timed overload or brew",
+		position = 5
+	)
+	String perfectSection = "perfect";
+
+	@ConfigItem(
+		keyName = "brewFeedback",
+		name = "Perfect brew message",
+		description = "Say in chat when a brew or Xeric's aid is drunk on the re-boost (clicked on the 0).<br>"
+			+ "The ding has its own setting below.",
+		section = perfectSection,
+		position = 0
+	)
+	default boolean brewFeedback()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "perfectSound",
+		name = "Ding on perfect timing",
+		description = "A short, quiet ding for a perfectly timed overload or brew",
+		section = perfectSection,
+		position = 1
+	)
+	default boolean perfectSound()
+	{
+		return true;
+	}
+
+	@Range(min = 0, max = 100)
+	@Units(Units.PERCENT)
+	@ConfigItem(
+		keyName = "soundVolume",
+		name = "Ding volume",
+		description = "Volume of the ding, 0 to 100%. 0 is silent.",
+		section = perfectSection,
+		position = 2
+	)
+	default int soundVolume()
+	{
+		return 25;
 	}
 
 	@ConfigSection(
