@@ -10,6 +10,7 @@ import java.awt.image.BufferedImage;
 import java.util.Set;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.Skill;
 import net.runelite.api.gameval.ItemID;
 import net.runelite.api.widgets.WidgetItem;
 import net.runelite.client.game.ItemManager;
@@ -253,6 +254,10 @@ class OverloadSyncOverlay extends WidgetItemOverlay
 	Cue brewCue(int tick)
 	{
 		if (!config.showBrewCountdown() || !clock.isOverloadTimingKnown())
+		{
+			return null;
+		}
+		if (config.brewOnlyBelowHp() && client.getBoostedSkillLevel(Skill.HITPOINTS) > config.brewHpThreshold())
 		{
 			return null;
 		}
