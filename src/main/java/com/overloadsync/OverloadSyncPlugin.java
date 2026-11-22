@@ -294,7 +294,7 @@ public class OverloadSyncPlugin extends Plugin
 	/** A brew or Xeric's aid was drunk. Perfect when it lands on the re-boost game tick (clicked on the 0). */
 	private void onBrewDrunk()
 	{
-		if (!config.brewFeedback() || !clock.isOverloadTimingKnown())
+		if (!clock.isOverloadTimingKnown())
 		{
 			return;
 		}
@@ -302,7 +302,10 @@ public class OverloadSyncPlugin extends Plugin
 		// about to be (0 away) when this message arrives.
 		if (clock.ticksToReboost(client.getTickCount()) % OverloadClock.REBOOST_TICKS == 0)
 		{
-			chat("Perfect brew timing: drunk on the re-boost, so the heal lands with your stats back at full boost.");
+			if (config.brewFeedback())
+			{
+				chat("Perfect brew timing: drunk on the re-boost, so the heal lands with your stats back at full boost.");
+			}
 			ding();
 		}
 	}
