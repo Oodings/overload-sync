@@ -53,6 +53,9 @@ public class OverloadSyncPlugin extends Plugin
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
+	@Inject
+	private PerfectSound sound;
+
 	private final OverloadClock clock = new OverloadClock();
 
 	/** Last boosted level of each decay skill, or -1 if not read yet. */
@@ -106,6 +109,7 @@ public class OverloadSyncPlugin extends Plugin
 	{
 		overlayManager.remove(overlay);
 		clock.reset();
+		sound.close();
 	}
 
 	@Subscribe
@@ -140,13 +144,21 @@ public class OverloadSyncPlugin extends Plugin
 			return;
 		}
 		String message = Text.removeTags(event.getMessage());
-		if (message.startsWith("You drink some of your") && message.toLowerCase().contains("prayer enhance"))
+		String lower = message.toLowerCase();
+		if (lower.contains("prayer enhance"))
 		{
-			prayerEnhanceUntilTick = client.getTickCount() + PRAYER_ENHANCE_MAX_TICKS;
+			if (lower.startsWith("you drink"))
+			{
+				prayerEnhanceUntilTick = client.getTickCount() + PRAYER_ENHANCE_MAX_TICKS;
+			}
+			else if (lower.contains("worn off"))
+			{
+				prayerEnhanceUntilTick = -1;
+			}
 		}
-		else if (message.equals("Your prayer enhance effect has worn off."))
+		else if (lower.startsWith("you drink") && (lower.contains("xeric's aid") || lower.contains("saradomin brew")))
 		{
-			prayerEnhanceUntilTick = -1;
+			onBrewDrunk();
 		}
 	}
 
@@ -165,7 +177,10 @@ public class OverloadSyncPlugin extends Plugin
 	{
 		if (event.getVarbitId() == VarbitID.RAIDS_CLIENT_INDUNGEON)
 		{
-			prayerEnhanceUntilTick = -1; // entering or leaving a raid
+			if (event.getValue() == 0)
+			{
+				prayerEnhanceUntilTick = -1; // leaving a raid ends the effect
+			}
 			return;
 		}
 		if (event.getVarbitId() != VarbitID.RAIDS_OVERLOAD_TIMER)
@@ -180,7 +195,7 @@ public class OverloadSyncPlugin extends Plugin
 			return;
 		}
 
-		if (clock.onOverloadVarbit(value, client.getTickCount()) && config.sipFeedback())
+		if (clock.onOverloadVarbit(value, client.getTickCount()))
 		{
 			reportSip();
 		}
@@ -210,17 +225,16 @@ public class OverloadSyncPlugin extends Plugin
 				int down = clock.ticksDownPerDecay();
 				if (down == -1)
 				{
-					chat("Decay clock found: your overloads now count down to a lined-up sip.");
+					chat("Decay clock found: your overloads now count down to a perfectly timed sip.");
 				}
-				else if (down == 1)
+				else if (down == 0)
 				{
-					chat("Decay clock found: your current overload is already lined up.");
+					chat("Decay clock found: your current overload is already perfectly timed.");
 				}
 				else
 				{
-					chat("Decay clock found: your current overload is off by " + (down - 1)
-						+ (down == 2 ? " tick" : " ticks") + " (" + down + " ticks a level down per decay)."
-						+ " Chain-potting keeps this timing for the rest of the raid.");
+					chat("Decay clock found: " + describeOffset(down) + " Chain-potting keeps this timing"
+						+ " for the rest of the raid.");
 				}
 			}
 		}
@@ -234,28 +248,70 @@ public class OverloadSyncPlugin extends Plugin
 		}
 	}
 
+	/** Plain-words version of how far a sip is from perfect (down = ticks after the decay that it re-boosts). */
+	private static String describeOffset(int down)
+	{
+		if (down <= OverloadClock.REBOOST_TICKS / 2)
+		{
+			String hint = down <= 2 ? " If you clicked on the green cue, set Click timing adjust to -" + down + "." : "";
+			return "your overload re-boosts " + down + (down == 1 ? " tick" : " ticks") + " after each decay, so stats"
+				+ " dip a level for " + down + (down == 1 ? " tick" : " ticks") + " each time." + hint;
+		}
+		int early = OverloadClock.REBOOST_TICKS - down;
+		String hint = early <= 2 ? " If you clicked on the green cue, set Click timing adjust to +" + early + "." : "";
+		return "your overload is " + early + (early == 1 ? " tick" : " ticks") + " early: each re-boost lands just"
+			+ " before a decay, so stats dip a level for " + down + " ticks each time." + hint;
+	}
+
 	private void reportSip()
 	{
 		int down = clock.ticksDownPerDecay();
 		if (down == -1)
 		{
-			chat("Overload drunk before the decay clock was seen, so it could not be lined up. A boosted combat"
+			sipChat("Overload drunk before the decay clock was seen, so it could not be lined up. A boosted combat"
 				+ " stat dropping by 1 (e.g. Defence after a Xeric's aid) sets the clock.");
 		}
-		else if (down == 1)
+		else if (down == 0)
 		{
-			chat("Overload lined up: stats will spend just 1 tick a level down per decay.");
-		}
-		else if (down == OverloadClock.REBOOST_TICKS)
-		{
-			chat("Overload re-boosts land on the decay tick itself. If you clicked on the green cue,"
-				+ " set Click timing adjust to +1.");
+			sipChat("Perfect overload timing: every re-boost lands on a decay tick, so your stats never dip a level.");
+			ding();
 		}
 		else
 		{
-			String hint = down == 2 ? " If you clicked on the green cue, set Click timing adjust to -1." : "";
-			chat("Overload off by " + (down - 1) + (down == 2 ? " tick" : " ticks") + ": stats will spend "
-				+ down + " ticks a level down per decay (best is 1)." + hint);
+			sipChat("Overload not perfect: " + describeOffset(down));
+		}
+	}
+
+	/** The chat line after a sip, unless sip feedback is off (the ding has its own setting). */
+	private void sipChat(String message)
+	{
+		if (config.sipFeedback())
+		{
+			chat(message);
+		}
+	}
+
+	/** A brew or Xeric's aid was drunk. Perfect when it lands on the re-boost game tick (clicked on the 0). */
+	private void onBrewDrunk()
+	{
+		if (!config.brewFeedback() || !clock.isOverloadTimingKnown())
+		{
+			return;
+		}
+		// Clicked on the 0, carried out on the re-boost game tick: the re-boost is either just counted (25 away) or
+		// about to be (0 away) when this message arrives.
+		if (clock.ticksToReboost(client.getTickCount()) % OverloadClock.REBOOST_TICKS == 0)
+		{
+			chat("Perfect brew timing: drunk on the re-boost, so the heal lands with your stats back at full boost.");
+			ding();
+		}
+	}
+
+	private void ding()
+	{
+		if (config.perfectSound())
+		{
+			sound.ding(config.soundVolume());
 		}
 	}
 
