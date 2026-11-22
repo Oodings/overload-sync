@@ -10,16 +10,12 @@ package com.overloadsync;
  * at each re-boost and reaches 0 when the overload wears off.</li>
  * </ul>
  *
- * Sipping 1 tick after a decay tick puts every re-boost 1 tick after a decay, so stats spend 1 tick a level
- * down per decay instead of up to 24. Chain-potting on the expiry tick keeps that alignment, since 500 is a
- * multiple of 25.
+ * Sipping so the first re-boost lands on a decay tick means no re-boost is ever late, so stats never dip a level.
+ * Chain-potting on the expiry tick keeps that alignment, since 500 is a multiple of 25.
  */
 class OverloadClock
 {
 	static final int REBOOST_TICKS = 25;
-
-	/** A click made during a tick is carried out on the next tick. */
-	static final int CLICK_LEAD = 1;
 
 	/** Tick of the last observed decay, or -1 if not seen since logging in. */
 	private int decayTick = -1;
@@ -93,7 +89,7 @@ class OverloadClock
 		{
 			return -1;
 		}
-		return Math.max(0, expiryTick() - tick);
+		return Math.max(0, expiryTick() + 1 - tick); // counts to 0 on the tick the overload actually wears off
 	}
 
 	/** Ticks until the next re-boost (1 to 25), or -1 if unknown. */
@@ -107,7 +103,7 @@ class OverloadClock
 	}
 
 	/**
-	 * Ticks until the tick to click an overload so it is drunk 1 tick after a decay (0 = click now), or -1 if the
+	 * Ticks until the tick to click an overload so it is drunk on a decay tick (0 = click now), or -1 if the
 	 * decay clock has not been seen. Repeats every 25 ticks.
 	 *
 	 * @param adjust moves the cue later (+) or earlier (-) to match how clicks land in practice
@@ -118,9 +114,9 @@ class OverloadClock
 		{
 			return -1;
 		}
-		int sipTick = decayTick + 1;
-		int clickTick = sipTick - CLICK_LEAD + adjust;
-		return Math.floorMod(clickTick - tick, REBOOST_TICKS);
+		// A click is carried out on the next game tick, and the game tick count only goes up after that tick's
+		// events, so clicking when the count equals the decay tick lands the sip on the decay itself.
+		return Math.floorMod(decayTick + adjust - tick, REBOOST_TICKS);
 	}
 
 	/**
@@ -133,13 +129,12 @@ class OverloadClock
 		{
 			return -1;
 		}
-		return expiryTick() - CLICK_LEAD + adjust - tick;
+		return expiryTick() + adjust - tick; // same one-tick click delay as above
 	}
 
 	/**
-	 * How many ticks stats spend a level down after each decay with the current overload, 1 being the best.
-	 * 25 means the re-boost lands on the decay tick itself, where it depends on the order the game handles them.
-	 * -1 if either clock is unknown.
+	 * How many ticks after each decay the overload re-boosts, i.e. how long stats sit a level down. 0 is perfect: the
+	 * re-boost lands on the decay tick itself and stats never dip. -1 if either clock is unknown.
 	 */
 	int ticksDownPerDecay()
 	{
@@ -147,8 +142,7 @@ class OverloadClock
 		{
 			return -1;
 		}
-		int gap = Math.floorMod(nextReboostTick - decayTick, REBOOST_TICKS);
-		return gap == 0 ? REBOOST_TICKS : gap;
+		return Math.floorMod(nextReboostTick - decayTick, REBOOST_TICKS);
 	}
 
 	private int expiryTick()
