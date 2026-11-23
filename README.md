@@ -51,6 +51,12 @@ boosted combat stat that drains normally does the job, including a Xeric's aid's
 - A pulsing green box around your overloads while no overload is running, and around your prayer
   enhances while no prayer enhance is running, so you don't forget the once-every-5-minutes potions.
 
+**Click blocking** (optional, off by default)
+- Stops you re-drinking too early by holding back the left-click on a potion until the right moment.
+  Overloads are held back while one is running, until the green tick to click the next. Prayer
+  enhances are held back until the effect has worn off.
+- A held-back potion is shaded grey, and right-click, then Drink, always works.
+
 ## Good to know
 
 - The decay clock can only be seen when a boosted combat stat drops by 1, and it restarts when you
