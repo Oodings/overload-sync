@@ -6,12 +6,16 @@ import javax.inject.Inject;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.ClientTick;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.MenuOpened;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.gameval.VarbitID;
@@ -70,6 +74,9 @@ public class OverloadSyncPlugin extends Plugin
 	/** Tick the current prayer enhance is assumed to end by, or -1 if none is running. */
 	private int prayerEnhanceUntilTick = -1;
 
+	/** True while the right-click menu is open, so a pick from it is never blocked. */
+	private boolean menuOpen;
+
 	OverloadClock getClock()
 	{
 		return clock;
@@ -78,6 +85,24 @@ public class OverloadSyncPlugin extends Plugin
 	boolean isPrayerEnhanceActive()
 	{
 		return prayerEnhanceUntilTick != -1 && client.getTickCount() < prayerEnhanceUntilTick;
+	}
+
+	/**
+	 * Whether a left-click on this potion should be held back right now: an overload until the tick to click the
+	 * next one, a prayer enhance until its effect has worn off.
+	 */
+	boolean isBlocked(int itemId)
+	{
+		if (OverloadSyncOverlay.OVERLOADS.contains(itemId))
+		{
+			return config.blockOverload() && clock.isOverloadTimingKnown()
+				&& clock.ticksToChainClick(client.getTickCount(), config.clickAdjust()) > 0;
+		}
+		if (OverloadSyncOverlay.PRAYER_ENHANCES.contains(itemId))
+		{
+			return config.blockPrayerEnhance() && isPrayerEnhanceActive();
+		}
+		return false;
 	}
 
 	@Provides
@@ -159,6 +184,38 @@ public class OverloadSyncPlugin extends Plugin
 		else if (lower.startsWith("you drink") && (lower.contains("xeric's aid") || lower.contains("saradomin brew")))
 		{
 			onBrewDrunk();
+		}
+	}
+
+	@Subscribe
+	public void onMenuOpened(MenuOpened event)
+	{
+		menuOpen = true;
+	}
+
+	@Subscribe
+	public void onClientTick(ClientTick event)
+	{
+		if (!client.isMenuOpen())
+		{
+			menuOpen = false;
+		}
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		boolean fromRightClickMenu = menuOpen;
+		menuOpen = false;
+		if (fromRightClickMenu)
+		{
+			return; // "Drink" picked from the right-click menu always works
+		}
+
+		MenuEntry entry = event.getMenuEntry();
+		if ("Drink".equalsIgnoreCase(Text.removeTags(entry.getOption()).trim()) && isBlocked(entry.getItemId()))
+		{
+			event.consume();
 		}
 	}
 
