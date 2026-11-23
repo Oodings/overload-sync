@@ -71,6 +71,11 @@ class OverloadSyncOverlay extends WidgetItemOverlay
 	public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem widgetItem)
 	{
 		Rectangle slot = widgetItem.getCanvasBounds();
+		if (config.greyOutBlocked() && plugin.isBlocked(itemId))
+		{
+			graphics.setColor(config.blockedColor());
+			graphics.fill(slot);
+		}
 		if (PRAYER_ENHANCES.contains(itemId))
 		{
 			if (config.pulseInactive() && !plugin.isPrayerEnhanceActive())
