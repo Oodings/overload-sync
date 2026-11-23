@@ -205,6 +205,64 @@ public interface OverloadSyncConfig extends Config
 	}
 
 	@ConfigSection(
+		name = "Click blocking",
+		description = "Hold back left-clicks on potions until the tick they should be drunk. Right-click still works.",
+		position = 6
+	)
+	String blockSection = "block";
+
+	@ConfigItem(
+		keyName = "blockOverload",
+		name = "Block early overload clicks",
+		description = "While an overload is running, a left-click on an overload does nothing until the tick to<br>"
+			+ "click the next one (the green tick). Right-click, then Drink, always works.",
+		section = blockSection,
+		position = 0
+	)
+	default boolean blockOverload()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "blockPrayerEnhance",
+		name = "Block early prayer enhance clicks",
+		description = "While a prayer enhance is running, a left-click on a prayer enhance does nothing until<br>"
+			+ "its effect has worn off. Right-click, then Drink, always works.",
+		section = blockSection,
+		position = 1
+	)
+	default boolean blockPrayerEnhance()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "greyOutBlocked",
+		name = "Grey out blocked potions",
+		description = "Shade a potion while its left-click is blocked",
+		section = blockSection,
+		position = 2
+	)
+	default boolean greyOutBlocked()
+	{
+		return true;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "blockedColour",
+		name = "Blocked colour",
+		description = "Shade drawn over a blocked potion",
+		section = blockSection,
+		position = 3
+	)
+	default Color blockedColor()
+	{
+		return new Color(70, 70, 70, 190);
+	}
+
+	@ConfigSection(
 		name = "Reminders",
 		description = "Pulse overloads and prayer enhances when their effect isn't running",
 		position = 2
